@@ -1,0 +1,40 @@
+name: Deploy NPM Package
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  build-n-publish:
+    name: Build and publish Oi to NPM
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check package version
+        uses: technote-space/package-version-check-action@v1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 14
+      - run: npm install
+      #      - run.js: npm run.js prepack
+      # Below is a manual set of prepack steps so we can try to figure out where the remote failure is.
+      - run: tsc -v
+      - run: rm -rf dist
+      - run: tsc -b
+      - run: npm run build
+      - run: npx oclif manifest
+      - run: npx oclif readme
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+      - if: steps.publish.outputs.type != 'none'
+        run: |
+          echo "Version changed: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
+      - name: Archive npm failure logs
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: npm-logs
+          path: ~/.npm/_logs
